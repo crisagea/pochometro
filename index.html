@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Marcador de Pocha (LocalStorage)</title>
+  <style>
+    :root{
+      --bg:#0b1020; --panel:#141a2a; --muted:#8aa0c7; --text:#e8efff; --accent:#6aa8ff; --accent2:#7ef0c4;
+      --danger:#ff6b6b; --warn:#ffb86b; --ok:#35d0a3; --border:#1f2640;
+      --radius:16px; --radius-sm:12px; --shadow: 0 10px 30px rgba(0,0,0,.35);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:radial-gradient(1200px 600px at 10% -10%, #1a2240 0%, #0b1020 60%),
+          radial-gradient(1000px 500px at 110% 0%, #0f1733 0%, #0b1020 60%); color:var(--text);
+          font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";}
+    header{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.00)); top:0; z-index:5}
+    header h1{font-size:18px;margin:0;font-weight:700;letter-spacing:.2px}
+    header .right{display:flex;gap:8px;align-items:center}
+
+    .app{display:grid; grid-template-columns: 310px 1fr; gap:16px; padding:16px;}
+    @media (max-width: 980px){ .app{grid-template-columns:1fr} }
+
+    .card{background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.008)); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow)}
+    .card .hd{padding:14px 14px 0; font-size:13px; color:var(--muted); text-transform:uppercase; letter-spacing:.1em}
+    .card .bd{padding:14px}
+
+    .btn{appearance:none; border:1px solid var(--border); background:linear-gradient(180deg,#1a2342,#121a32); color:var(--text); padding:10px 12px; border-radius:12px; cursor:pointer; font-weight:600; font-size:14px}
+    .btn:hover{filter:brightness(1.06)}
+    .btn:disabled{opacity:.55; cursor:not-allowed}
+    .btn.primary{border-color:transparent; background:linear-gradient(180deg, var(--accent), #3f72ff); color:#04112a}
+    .btn.ghost{background:transparent}
+    .btn.warn{background:linear-gradient(180deg, #ffb86b, #ff8f3f); color:#2a1300; border-color:transparent}
+    .btn.danger{background:linear-gradient(180deg, #ff6b6b, #ff4d4d); color:#2a0000; border-color:transparent}
+
+    .list{display:flex; flex-direction:column; gap:8px}
+    .game-item{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px; border:1px solid var(--border); border-radius:12px; background:linear-gradient(180deg,#141b31,#121a30)}
+    .game-item .meta{display:flex; flex-direction:column; gap:2px}
+    .game-item .meta .name{font-weight:700}
+    .game-item .meta .sub{font-size:12px; color:var(--muted)}
+
+    .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+    label{font-size:12px; color:var(--muted)}
+    input[type="text"], input[type="number"], select{width:100%; padding:10px 12px; border-radius:12px; border:1px solid var(--border); background:linear-gradient(180deg,#0f1428,#0c1224); color:var(--accent)}
+    .field{display:flex; flex-direction:column; gap:6px; min-width:110px; flex:1}
+    .muted{color:var(--muted)}
+    .pill{display:inline-flex; align-items:center; gap:6px; font-size:12px; color:#04112a; background:linear-gradient(180deg,var(--accent2),#36e0a9); padding:6px 10px; border-radius:999px; font-weight:700}
+
+    .grid{display:grid; gap:10px}
+    .grid.cols-2{grid-template-columns:repeat(2,1fr)}
+    .grid.cols-3{grid-template-columns:repeat(3,1fr)}
+    .grid.cols-4{grid-template-columns:repeat(4,1fr)}
+    @media (max-width:720px){ .grid.cols-3, .grid.cols-4{grid-template-columns:1fr 1fr} }
+
+    table{width:100%; border-collapse:collapse; font-size:14px}
+    th, td{padding:8px 10px; border-bottom:1px solid var(--border); text-align:center}
+    th{position:sticky; top:0; background:#0f162a; z-index:2}
+    tbody tr:hover{background:rgba(255,255,255,.03)}
+
+    .player-card{border:1px solid var(--border); border-radius:12px; padding:12px; display:flex; flex-direction:column; gap:10px; background:linear-gradient(180deg,#141b31,#121a30)}
+    .player-card .name{font-weight:800; letter-spacing:.2px}
+    .controls{display:flex; gap:8px; align-items:center}
+    .controls input[type="number"]{max-width:80px; text-align:center}
+    .chip{display:inline-flex; align-items:center; gap:6px; border:1px solid var(--border); padding:6px 10px; border-radius:999px; color:var(--muted); font-weight:700}
+    .score{font-weight:800}
+
+    .sticky-actions{position:sticky; bottom:0; background:linear-gradient(180deg, rgba(4,12,28,0), rgba(4,12,28,.6) 40%, rgba(4,12,28, .8)); padding:12px; display:flex; gap:10px; justify-content:flex-end}
+
+    .divider{height:1px; background:var(--border); margin:8px 0}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🃏 Pocha — Marcador con LocalStorage</h1>
+    <div class="right">
+      <button class="btn ghost" id="exportBtn" title="Exportar JSON">Exportar</button>
+      <button class="btn ghost" id="importBtn" title="Importar JSON">Importar</button>
+      <input type="file" id="importFile" accept="application/json" style="display:none" />
+    </div>
+  </header>
+
+  <div class="app">
+    <!-- Sidebar: partidas -->
+    <aside class="card" id="gamesPanel">
+      <div class="hd">Partidas guardadas</div>
+      <div class="bd">
+        <div class="row">
+          <button class="btn primary" id="newGameBtn">Nueva partida</button>
+        </div>
+        <div class="divider"></div>
+        <div id="gamesList" class="list" aria-live="polite"></div>
+      </div>
+    </aside>
+
+    <!-- Main content -->
+    <main class="card" id="main">
+      <div class="bd" id="view"></div>
+    </main>
+  </div>
+
+  <template id="setupTpl">
+    <div class="grid cols-2">
+      <div class="field"><label>Nombre de la partida</label><input id="gameName" type="text" placeholder="Ej. Sábado en casa" /></div>
+      <div class="field"><label>Baraja</label>
+        <select id="deckSize">
+          <option value="40" selected>40 cartas</option>
+          <option value="48">48 cartas</option>
+          <option value="49">48 cartas + comodín</option>
+          <option value="52">52 cartas</option>
+        </select>
+      </div>
+    </div>
+    <div class="grid cols-3" style="margin-top:12px">
+      <div class="field"><label>Nº jugadores</label><input id="playerCount" type="number" min="2" max="10" value="4" /></div>
+      <div class="field"><label>Dealer inicial</label><select id="dealerStart"></select></div>
+      <div class="field"><label>Regla: suma de apuestas ≠ bazas</label>
+        <select id="noEqualRule">
+          <option value="1" selected>Enforzar (clásico)</option>
+          <option value="0">No enforzar</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="playersInputs" class="grid cols-2" style="margin-top:12px"></div>
+
+    <div class="field" style="margin-top:12px">
+      <label>Regla de puntuación</label>
+      <div class="chip">+10 por acertar y +5 por cada baza acertada; −5 por cada baza equivocada.</div>
+    </div>
+
+    <div class="sticky-actions">
+      <button class="btn" id="cancelSetup">Cancelar</button>
+      <button class="btn primary" id="createGame">Crear partida</button>
+    </div>
+  </template>
+
+  <template id="playTpl">
+    <div class="row" style="justify-content:space-between">
+      <div class="row" style="gap:12px">
+        <span class="pill">Ronda <span id="roundNum">1</span></span>
+        <span class="chip">Cartas por jugador: <b id="cardsThisRound">1</b></span>
+        <span class="chip">Dealer: <b id="dealerName"></b></span>
+      </div>
+      <div class="row">
+        <button class="btn" id="undoRound">Deshacer ronda</button>
+        <button class="btn warn" id="resetGame">Reiniciar partida</button>
+      </div>
+    </div>
+
+    <div class="grid cols-4" id="playersRound" style="margin-top:12px"></div>
+
+    <div class="row" style="justify-content:space-between; margin-top:8px">
+      <div class="chip">Suma de apuestas: <b id="sumBids">0</b></div>
+      <div class="chip">Suma de bazas: <b id="sumTricks">0</b></div>
+    </div>
+
+    <div class="sticky-actions">
+      <button class="btn" id="clearTricks">Limpiar bazas</button>
+      <button class="btn primary" id="closeRound">Cerrar ronda</button>
+    </div>
+
+    <div class="divider"></div>
+
+    <h3>Marcador</h3>
+    <div id="scoreboard"></div>
+
+    <div class="divider"></div>
+
+    <h3>Historial de rondas</h3>
+    <div style="max-height:300px; overflow:auto">
+      <table id="historyTable">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Cartas</th>
+            <th>Dealer</th>
+            <th colspan="100">Jugadores: apuesta → bazas (pts ronda)</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </template>
+
+  <script>
+  // --------- Storage helpers ---------
+  const LS_KEY = 'pocha.scorekeeper.v1';
+  const $ = sel => document.querySelector(sel);
+  const $$ = sel => Array.from(document.querySelectorAll(sel));
+
+  function uid(){ return Math.random().toString(36).slice(2, 10); }
+
+  function loadAll(){
+    try{ return JSON.parse(localStorage.getItem(LS_KEY)) || { games: [] }; }
+    catch(e){ return { games: [] }; }
+  }
+  function saveAll(db){ localStorage.setItem(LS_KEY, JSON.stringify(db)); }
+
+  // --------- Game lifecycle ---------
+  function computeRoundPlan(deckSize, playerCount){
+    const maxCards = Math.floor(deckSize / playerCount); // máximo nº de cartas por jugador
+    const plan = [];
+    // Subida 1..max
+    for(let c=1;c<=maxCards;c++) plan.push(c);
+    // Rondas con toda la mano: tantas como jugadores
+    for(let i=0;i<playerCount;i++) plan.push(maxCards);
+    // Bajada max-1..1
+    for(let c=maxCards-1;c>=1;c--) plan.push(c);
+    return plan; // array de cartas por jugador por ronda
+  }
+
+  function newGame({name, deckSize, players, dealerStartIdx, noEqualRule, scoring}){
+    const id = uid();
+    const createdAt = new Date().toISOString();
+    const plan = computeRoundPlan(deckSize, players.length);
+    return { id, name, createdAt, deckSize, players, dealerStartIdx, noEqualRule, scoring, plan,
+      rounds: [],
+      status: 'playing' };
+  }
+
+  function listGames(){ return loadAll().games; }
+  function getGame(id){ return listGames().find(g=>g.id===id); }
+  function upsertGame(game){
+    const db = loadAll();
+    const i = db.games.findIndex(g=>g.id===game.id);
+    if(i>=0) db.games[i]=game; else db.games.unshift(game);
+    saveAll(db);
+  }
+  function deleteGame(id){
+    const db = loadAll();
+    db.games = db.games.filter(g=>g.id!==id);
+    saveAll(db);
+  }
+
+  // --------- Scoring (regla fija solicitada) ---------
+  function scoreFor({bid, tricks}){
+    // +10 por acertar y +5 por cada baza acertada; -5 por cada baza equivocada
+    if (tricks === bid) return 10 + 5 * tricks;
+    return -5 * Math.abs(tricks - bid);
+  }
+
+  // --------- UI: Games panel ---------
+  let currentGameId = null;
+
+  function renderGames(){
+    const list = $('#gamesList');
+    const games = listGames();
+    list.innerHTML = '';
+    if(!games.length){ list.innerHTML = '<p class="muted">No hay partidas. Crea una nueva.</p>'; return; }
+    games.forEach(g=>{
+      const div = document.createElement('div');
+      div.className = 'game-item';
+      const totalRounds = g.plan?.length || 0;
+      const played = g.rounds.length;
+      const pct = Math.floor((played/Math.max(1,totalRounds))*100);
+      div.innerHTML = `
+        <div class="meta">
+          <div class="name">${g.name || 'Sin título'}</div>
+          <div class="sub">${new Date(g.createdAt).toLocaleString()} · ${g.players.length} jugadores · ${played}/${totalRounds} rondas (${pct}%)</div>
+        </div>
+        <div class="row">
+          <button class="btn" data-open="${g.id}">Abrir</button>
+          <button class="btn danger" data-del="${g.id}">Borrar</button>
+        </div>`;
+      list.appendChild(div);
+    });
+    list.addEventListener('click', e=>{
+      const idOpen = e.target.getAttribute('data-open');
+      const idDel = e.target.getAttribute('data-del');
+      if(idOpen){ openGame(idOpen); }
+      if(idDel){ if(confirm('¿Borrar esta partida?')){ deleteGame(idDel); renderGames(); if(currentGameId===idDel){ currentGameId=null; $('#view').innerHTML=''; } } }
+    }, {once:true});
+  }
+
+  // --------- UI: Setup ---------
+  function showSetup(){
+    const v = $('#view');
+    v.innerHTML = $('#setupTpl').innerHTML;
+    const playerCountInput = $('#playerCount');
+    const dealerStart = $('#dealerStart');
+    function renderPlayerInputs(){
+      const n = Math.max(2, Math.min(10, parseInt(playerCountInput.value||'4',10)));
+      dealerStart.innerHTML = '';
+      for(let i=0;i<n;i++){
+        const opt = document.createElement('option'); opt.value=i; opt.textContent = `Jugador ${i+1}`; dealerStart.appendChild(opt);
+      }
+      const wrap = $('#playersInputs'); wrap.innerHTML='';
+      for(let i=0;i<n;i++){
+        const div = document.createElement('div'); div.className='field';
+        div.innerHTML = `<label>Jugador ${i+1}</label><input type="text" placeholder="Nombre" data-player-name="${i}" />`;
+        wrap.appendChild(div);
+      }
+    }
+    renderPlayerInputs();
+    playerCountInput.addEventListener('input', renderPlayerInputs);
+
+    $('#cancelSetup').onclick = ()=>{ $('#view').innerHTML=''; };
+    $('#createGame').onclick = ()=>{
+      const name = ($('#gameName').value||'').trim() || 'Partida sin título';
+      const deckSize = parseInt($('#deckSize').value,10);
+      const n = Math.max(2, Math.min(10, parseInt($('#playerCount').value||'4',10)));
+      const players=[];
+      for(let i=0;i<n;i++){
+        const inp = document.querySelector(`[data-player-name="${i}"]`);
+        players.push({ id: uid(), name: (inp.value||`Jugador ${i+1}`).trim() });
+      }
+      const dealerStartIdx = parseInt($('#dealerStart').value,10)||0;
+      const noEqualRule = $('#noEqualRule').value==='1';
+      const scoring = { system: 'pocha-10-5' };
+      const game = newGame({name, deckSize, players, dealerStartIdx, noEqualRule, scoring});
+      upsertGame(game);
+      renderGames();
+      openGame(game.id);
+    };
+  }
+
+  // --------- UI: Play ---------
+  function openGame(id){
+    currentGameId = id;
+    const game = getGame(id);
+    const v = $('#view');
+    v.innerHTML = $('#playTpl').innerHTML;
+
+    function roundIndex(){ return game.rounds.length; }
+    function isFinished(){ return roundIndex() >= game.plan.length; }
+
+    function renderHeader(){
+      $('#roundNum').textContent = isFinished()? '—' : (roundIndex()+1);
+      const cards = isFinished()? 0 : game.plan[roundIndex()];
+      $('#cardsThisRound').textContent = cards;
+      const dealerIdx = (game.dealerStartIdx + roundIndex()) % game.players.length;
+      $('#dealerName').textContent = game.players[dealerIdx].name;
+    }
+
+    function playerRowHTML(p, idx, cards){
+      const max = cards;
+      return `<div class="player-card" data-pid="${p.id}">
+        <div class="row" style="justify-content:space-between">
+          <div class="name">${p.name}</div>
+          <div class="chip">Total: <span class="score" id="total_${p.id}">0</span></div>
+        </div>
+        <div class="controls">
+          <span class="muted">Apuesta</span>
+          <button class="btn" data-dec-bid="${p.id}">−</button>
+          <input type="number" min="0" max="${max}" value="0" data-bid="${p.id}" />
+          <button class="btn" data-inc-bid="${p.id}">+</button>
+        </div>
+        <div class="controls">
+          <span class="muted">Bazas</span>
+          <button class="btn" data-dec-tricks="${p.id}">−</button>
+          <input type="number" min="0" max="${max}" value="0" data-tricks="${p.id}" />
+          <button class="btn" data-inc-tricks="${p.id}">+</button>
+        </div>
+      </div>`;
+    }
+
+    function renderPlayersRound(){
+      const cards = isFinished()? 0 : game.plan[roundIndex()];
+      const wrap = $('#playersRound');
+      wrap.innerHTML = game.players.map((p,i)=>playerRowHTML(p,i,cards)).join('');
+
+      // stepper buttons: usar un único handler estable
+      wrap.onclick = (e)=>{
+        const incBid = e.target.getAttribute('data-inc-bid');
+        const decBid = e.target.getAttribute('data-dec-bid');
+        const incT = e.target.getAttribute('data-inc-tricks');
+        const decT = e.target.getAttribute('data-dec-tricks');
+        function adjust(selectorAttr, pid, delta){
+          const inp = document.querySelector(`[${selectorAttr}="${pid}"]`);
+          const max = parseInt(inp.getAttribute('max'),10);
+          let v = parseInt(inp.value||'0',10) + delta; v = Math.max(0, Math.min(max, v)); inp.value=v; recomputeSums();
+        }
+        if(incBid) adjust('data-bid', incBid, +1);
+        if(decBid) adjust('data-bid', decBid, -1);
+        if(incT) adjust('data-tricks', incT, +1);
+        if(decT) adjust('data-tricks', decT, -1);
+      };
+
+      // change handlers para mantener sumas
+      $$('#playersRound input[type="number"]').forEach(inp=> inp.addEventListener('input', recomputeSums));
+      recomputeSums();
+    }
+
+    function recomputeSums(){
+      const cards = isFinished()? 0 : game.plan[roundIndex()];
+      let sumBids=0, sumTricks=0;
+      game.players.forEach(p=>{
+        const b = parseInt(document.querySelector(`[data-bid="${p.id}"]`).value||'0',10);
+        const t = parseInt(document.querySelector(`[data-tricks="${p.id}"]`).value||'0',10);
+        sumBids += b; sumTricks += t;
+      });
+      $('#sumBids').textContent = sumBids;
+      $('#sumTricks').textContent = sumTricks;
+      const target = cards; // total de bazas en la ronda
+      if(game.noEqualRule){
+        // Visual warn si suma de apuestas = target
+        $('#sumBids').parentElement.style.outline = (sumBids===target? '2px solid var(--warn)': 'none');
+      }
+    }
+
+    function renderScoreboard(){
+      const totals = {};
+      game.players.forEach(p=> totals[p.id]=0);
+      game.rounds.forEach(r=>{
+        r.scores.forEach(s=> totals[s.playerId] += s.delta);
+      });
+      game.players.forEach(p=>{
+        $('#total_'+p.id).textContent = totals[p.id];
+      });
+    }
+
+    function renderHistory(){
+      const tb = $('#historyTable tbody'); tb.innerHTML='';
+      game.rounds.forEach((r,idx)=>{
+        const tr = document.createElement('tr');
+        const dealerName = game.players[r.dealerIdx].name;
+        let html = `<td>${idx+1}</td><td>${r.cards}</td><td>${dealerName}</td>`;
+        r.scores.forEach(s=>{
+          const p = game.players.find(pp=>pp.id===s.playerId);
+          html += `<td><b>${p.name}</b>: ${s.bid} → ${s.tricks} (<span style="color:${s.delta>=0?'#35d0a3':'#ff6b6b'}">${s.delta>=0?'+':''}${s.delta}</span>)</td>`;
+        });
+        tr.innerHTML = html; tb.appendChild(tr);
+      });
+    }
+
+    function finalizeRound(){
+      if(isFinished()){ alert('La partida ya ha finalizado.'); return; }
+      const cards = game.plan[roundIndex()];
+      const dealerIdx = (game.dealerStartIdx + roundIndex()) % game.players.length;
+
+      // Leer apuestas y bazas
+      const perPlayer = game.players.map(p=>{
+        const bid = parseInt(document.querySelector(`[data-bid="${p.id}"]`).value||'0',10);
+        const tricks = parseInt(document.querySelector(`[data-tricks="${p.id}"]`).value||'0',10);
+        return {playerId:p.id, bid, tricks};
+      });
+
+      const sumBids = perPlayer.reduce((a,b)=>a+b.bid,0);
+      const sumTricks = perPlayer.reduce((a,b)=>a+b.tricks,0);
+
+      if(perPlayer.some(x=> x.bid>cards || x.tricks>cards)){
+        alert('Apuestas/bazas no pueden superar el nº de cartas de la ronda.'); return;
+      }
+      if(sumTricks !== cards){
+        if(!confirm(`La suma de bazas (${sumTricks}) no coincide con las bazas totales (${cards}). ¿Confirmas?`)) return;
+      }
+      if(game.noEqualRule && sumBids===cards){
+        alert('Regla activa: la suma de apuestas no puede ser igual a las bazas totales.'); return;
+      }
+
+      // Calcular puntuaciones
+      const scores = perPlayer.map(x=> ({
+        ...x,
+        delta: scoreFor({bid:x.bid, tricks:x.tricks})
+      }));
+
+      game.rounds.push({
+        idx: roundIndex(),
+        cards,
+        dealerIdx,
+        scores
+      });
+
+      upsertGame(game);
+      renderAll();
+    }
+
+    function undo(){
+      if(!game.rounds.length) return;
+      game.rounds.pop();
+      upsertGame(game);
+      renderAll();
+    }
+
+    function clearTricks(){
+      game.players.forEach(p=>{
+        document.querySelector(`[data-tricks="${p.id}"]`).value = 0;
+      });
+      recomputeSums();
+    }
+
+    function resetGame(){
+      if(!confirm('Esto borrará todas las rondas de esta partida.')) return;
+      game.rounds = [];
+      upsertGame(game);
+      renderAll();
+    }
+
+    function renderAll(){
+      renderHeader();
+      renderPlayersRound();
+      renderScoreboard();
+      renderHistory();
+      if(isFinished()){
+        $('#closeRound').disabled = true;
+        const totals = {};
+        game.players.forEach(p=> totals[p.id]=0);
+        game.rounds.forEach(r=> r.scores.forEach(s=> totals[s.playerId]+=s.delta));
+        const arr = Object.entries(totals).map(([pid,score])=>({pid, score, name: game.players.find(p=>p.id===pid).name}));
+        arr.sort((a,b)=>b.score-a.score);
+        const podium = arr.map((x,i)=> `${i+1}. ${x.name} (${x.score})`).join(' · ');
+        const note = document.createElement('div');
+        note.className='pill'; note.style.marginTop='8px'; note.textContent = 'Partida finalizada — ' + podium;
+        $('#scoreboard').prepend(note);
+      }
+    }
+
+    // Wire actions
+    $('#closeRound').onclick = finalizeRound;
+    $('#undoRound').onclick = undo;
+    $('#clearTricks').onclick = clearTricks;
+    $('#resetGame').onclick = resetGame;
+
+    renderAll();
+  }
+
+  // --------- Export/Import ---------
+  $('#exportBtn').onclick = ()=>{
+    const data = loadAll();
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'pocha_scorekeeper_backup.json';
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
+  };
+  $('#importBtn').onclick = ()=> $('#importFile').click();
+  $('#importFile').addEventListener('change', (e)=>{
+    const file = e.target.files?.[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      try{
+        const json = JSON.parse(reader.result);
+        if(!json || !Array.isArray(json.games)) throw new Error('Formato no válido');
+        saveAll(json); renderGames(); alert('Datos importados ✅');
+      }catch(err){ alert('Error al importar: '+err.message); }
+    };
+    reader.readAsText(file);
+  });
+
+  // --------- App init ---------
+  function init(){
+    renderGames();
+    $('#newGameBtn').onclick = showSetup;
+    if(listGames().length===0){ showSetup(); }
+  }
+  init();
+  </script>
+</body>
+</html>
